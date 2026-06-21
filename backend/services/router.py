@@ -1,48 +1,38 @@
-def classify_prompt(prompt: str):
-    score = 0
-    prompt_lower = prompt.lower()
+from sqlalchemy import text
 
-    if len(prompt.split()) > 30:
-        score += 1
-
-    coding_keywords = [
-        "code",
-        "python",
-        "java",
-        "c++",
-        "algorithm",
-        "leetcode",
-        "bug",
-        "debug",
-    ]
-
-    if any(word in prompt_lower for word in coding_keywords):
-        score += 2
-
-    reasoning_keywords = [
-        "compare",
-        "analyze",
-        "design",
-        "explain why",
-        "tradeoff",
-        "architecture",
-    ]
-
-    if any(word in prompt_lower for word in reasoning_keywords):
-        score += 2
-
-    if score >= 3:
-        return "complex"
-
-    return "simple"
+from database import engine
+from services.embedding_service import get_embedding
 
 
-def choose_provider(prompt: str):
-    complexity = classify_prompt(prompt)
+def choose_provider(prompt: str) -> str:
 
-    print(f"Prompt classified as: {complexity}")
+    embedding = get_embedding(prompt)
 
-    if complexity == "simple":
-        return "groq"
+    vector_string = (
+        "[" +
+        ",".join(str(x) for x in embedding) +
+        "]"
+    )
 
-    return "gemini"
+    with engine.connect() as conn:
+
+        result = conn.execute(
+            text(
+                """
+                SELECT p.name
+                FROM route_prototypes rp
+                JOIN providers p
+                    ON p.id = rp.provider_id
+                ORDER BY
+                    rp.embedding <=> CAST(:embedding AS vector)
+                LIMIT 1
+                """
+            ),
+            {
+                "embedding": vector_string
+            }
+        )
+
+        row = result.fetchone()
+
+    return row.name if row else "groq"

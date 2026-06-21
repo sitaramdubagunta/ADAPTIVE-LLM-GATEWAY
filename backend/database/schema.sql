@@ -10,6 +10,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE providers (
     id SERIAL PRIMARY KEY,
+
     name VARCHAR(50) UNIQUE NOT NULL
 );
 
@@ -19,51 +20,97 @@ VALUES
 ('gemini');
 
 -- ==========================================
--- Route Prototypes
--- Cold-start router
+-- Users
 -- ==========================================
 
-CREATE TABLE route_prototypes (
-    id SERIAL PRIMARY KEY,
+CREATE TABLE users (
+    id BIGSERIAL PRIMARY KEY,
 
-    category VARCHAR(50) NOT NULL,
+    email TEXT UNIQUE NOT NULL,
 
-    example_prompt TEXT NOT NULL,
+    password_hash TEXT,
+
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- ==========================================
+-- User Provider Keys
+-- Bring Your Own API Key
+-- ==========================================
+
+CREATE TABLE user_provider_keys (
+    id BIGSERIAL PRIMARY KEY,
+
+    user_id BIGINT NOT NULL
+        REFERENCES users(id),
 
     provider_id INTEGER NOT NULL
         REFERENCES providers(id),
 
-    embedding VECTOR(384) NOT NULL
+    encrypted_api_key TEXT NOT NULL,
+
+    created_at TIMESTAMP DEFAULT NOW(),
+
+    UNIQUE(user_id, provider_id)
+);
+
+-- ==========================================
+-- Agents
+-- Future Agent Support
+-- ==========================================
+
+CREATE TABLE agents (
+    id BIGSERIAL PRIMARY KEY,
+
+    name VARCHAR(100) UNIQUE NOT NULL,
+
+    description TEXT,
+
+    provider_id INTEGER
+        REFERENCES providers(id),
+
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- ==========================================
+-- Chats
+-- ==========================================
+
+CREATE TABLE chats (
+    id BIGSERIAL PRIMARY KEY,
+
+    user_id BIGINT NOT NULL
+        REFERENCES users(id),
+
+    agent_id BIGINT
+        REFERENCES agents(id),
+
+    title TEXT,
+
+    created_at TIMESTAMP DEFAULT NOW(),
+
+    updated_at TIMESTAMP DEFAULT NOW()
 );
 
 -- ==========================================
 -- Requests
--- Semantic cache source of truth
+-- User Messages
 -- ==========================================
 
 CREATE TABLE requests (
     id BIGSERIAL PRIMARY KEY,
 
+    chat_id BIGINT NOT NULL
+        REFERENCES chats(id),
+
     prompt TEXT NOT NULL,
 
-    embedding VECTOR(384) NOT NULL,
-
-    status VARCHAR(20) NOT NULL,
-
-    created_at TIMESTAMP DEFAULT NOW(),
-
-    CONSTRAINT request_status_check
-    CHECK (
-        status IN (
-            'pending',
-            'completed',
-            'failed'
-        )
-    )
+    created_at TIMESTAMP DEFAULT NOW()
 );
 
 -- ==========================================
 -- Responses
+-- LLM Outputs
 -- ==========================================
 
 CREATE TABLE responses (
@@ -87,36 +134,36 @@ CREATE TABLE responses (
 );
 
 -- ==========================================
--- Routing Decisions
+-- Route Prototypes
+-- Cold Start Router
 -- ==========================================
 
-CREATE TABLE routing_decisions (
+CREATE TABLE route_prototypes (
     id BIGSERIAL PRIMARY KEY,
 
-    request_id BIGINT NOT NULL
-        REFERENCES requests(id),
+    category VARCHAR(50) NOT NULL,
+
+    example_prompt TEXT NOT NULL,
+
+    embedding VECTOR(384) NOT NULL,
 
     provider_id INTEGER NOT NULL
-        REFERENCES providers(id),
-
-    router_type VARCHAR(50) NOT NULL,
-
-    confidence FLOAT,
-
-    created_at TIMESTAMP DEFAULT NOW()
+        REFERENCES providers(id)
 );
 
 -- ==========================================
 -- Indexes
 -- ==========================================
 
+CREATE INDEX chats_user_idx
+ON chats(user_id);
+
+CREATE INDEX requests_chat_idx
+ON requests(chat_id);
+
 CREATE INDEX responses_request_idx
 ON responses(request_id);
 
-CREATE INDEX routing_request_idx
-ON routing_decisions(request_id);
-
--- pgvector HNSW index
-CREATE INDEX requests_embedding_idx
-ON requests
+CREATE INDEX route_prototypes_embedding_idx
+ON route_prototypes
 USING hnsw (embedding vector_cosine_ops);

@@ -1,14 +1,10 @@
 def classify_prompt(prompt: str):
-
     score = 0
-
     prompt_lower = prompt.lower()
 
-    # Long prompt
     if len(prompt.split()) > 30:
         score += 1
 
-    # Coding
     coding_keywords = [
         "code",
         "python",
@@ -17,20 +13,19 @@ def classify_prompt(prompt: str):
         "algorithm",
         "leetcode",
         "bug",
-        "debug"
+        "debug",
     ]
 
     if any(word in prompt_lower for word in coding_keywords):
         score += 2
 
-    # Reasoning
     reasoning_keywords = [
         "compare",
         "analyze",
         "design",
         "explain why",
         "tradeoff",
-        "architecture"
+        "architecture",
     ]
 
     if any(word in prompt_lower for word in reasoning_keywords):
@@ -40,3 +35,14 @@ def classify_prompt(prompt: str):
         return "complex"
 
     return "simple"
+
+
+def choose_provider(prompt: str):
+    complexity = classify_prompt(prompt)
+
+    print(f"Prompt classified as: {complexity}")
+
+    if complexity == "simple":
+        return "groq"
+
+    return "gemini"

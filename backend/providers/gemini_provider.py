@@ -9,9 +9,9 @@ client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 
 class GeminiProvider:
-    def generate(self, message: str):
+    def generate(self, message: str, model: str = None):
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=model or "gemini-2.5-flash",
             contents=message,
         )
 

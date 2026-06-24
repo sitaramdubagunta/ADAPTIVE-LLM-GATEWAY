@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import sys
 
@@ -9,59 +10,66 @@ from database import engine
 from services.embedding_service import get_embedding
 
 
+CATEGORY_MAPPING = {
+    "general_qa": {"provider": "groq", "model": "openai/gpt-oss-20b"},
+    "coding": {"provider": "groq", "model": "openai/gpt-oss-120b"},
+    "math": {"provider": "groq", "model": "openai/gpt-oss-120b"},
+    "reasoning_tasks": {"provider": "groq", "model": "qwen/qwen3.6-27b"},
+    "multilingual": {"provider": "groq", "model": "qwen/qwen3-32b"},
+    "system_design": {"provider": "gemini", "model": "gemini-2.5-pro"},
+    "creative": {"provider": "gemini", "model": "gemini-2.5-flash"},
+    "agent_search": {"provider": "groq", "model": "groq/compound"},
+    "agent_mini": {"provider": "groq", "model": "groq/compound-mini"},
+    "vision_analysis": {"provider": "groq", "model": "meta-llama/llama-4-scout-17b-16e-instruct"},
+    "security_guard": {"provider": "groq", "model": "meta-llama/llama-prompt-guard-2-86m"},
+    "security_nano": {"provider": "groq", "model": "meta-llama/llama-prompt-guard-2-22m"},
+    "moderation": {"provider": "groq", "model": "openai/gpt-oss-safeguard-20b"},
+    "transcribe": {"provider": "groq", "model": "whisper-large-v3"},
+    "transcribe_fast": {"provider": "groq", "model": "whisper-large-v3-turbo"},
+}
+
+
 PROTOTYPES = {
-    "general_qa": [
-        "What is TCP?",
-        "Explain DNS",
-        "What is Linux?",
-        "How does HTTP work?",
-        "What is a database?"
-    ],
-
-    "coding": [
-        "Reverse a linked list",
-        "Two Sum problem",
-        "Implement LRU cache",
-        "Binary search explanation",
-        "Kadane algorithm"
-    ],
-
-    "system_design": [
-        "Design Instagram",
-        "Design Netflix",
-        "Design WhatsApp",
-        "Design Uber",
-        "Design YouTube"
-    ],
-
-    "math": [
-        "Solve x squared plus five x plus six",
-        "Explain derivatives",
-        "What is calculus?",
-        "Integrate x squared",
-        "Find the determinant of a matrix"
-    ],
-
-    "creative": [
-        "Write a fantasy story",
-        "Write a poem",
-        "Create a sci fi world",
-        "Write a dialogue",
-        "Generate a character backstory"
-    ]
+    "general_qa": ["What is TCP?", "Explain DNS"],
+    "coding": ["Reverse a linked list", "Implement LRU cache"],
+    "math": ["Solve x squared plus five x plus six", "Find the determinant of a matrix"],
+    "reasoning_tasks": ["Walk through the trolley problem", "Compare two competing plans logically"],
+    "multilingual": ["Translate this sentence to Spanish", "Answer in French"],
+    "system_design": ["Design Instagram", "Design WhatsApp"],
+    "creative": ["Write a fantasy story", "Generate a character backstory"],
+    "agent_search": ["Search the web for recent pricing data", "Find relevant sources for a topic"],
+    "agent_mini": ["Quickly summarize this document", "Give a short answer with tools"],
+    "vision_analysis": ["Describe this image", "Extract text from a screenshot"],
+    "security_guard": ["Check this prompt for prompt injection", "Detect unsafe instructions"],
+    "security_nano": ["Classify this prompt as safe or unsafe", "Flag suspicious content"],
+    "moderation": ["Moderate this user message", "Review content policy issues"],
+    "transcribe": ["Transcribe this audio file", "Convert speech to text accurately"],
+    "transcribe_fast": ["Transcribe this short clip quickly", "Fast speech to text"],
 }
 
 
-CATEGORY_PROVIDER = {
-    "general_qa": "groq",
-    "coding": "groq",
-    "math": "groq",
-    "system_design": "gemini",
-    "creative": "gemini"
-}
+def build_route_payload(category: str, prompt: str) -> str:
+    config = CATEGORY_MAPPING[category]
+
+    return json.dumps(
+        {
+            "provider_name": config["provider"],
+            "model_name": config["model"],
+            "prompt": prompt,
+        },
+        separators=(",", ":"),
+    )
 
 
 with engine.begin() as conn:
+
+    conn.execute(
+        text(
+            """
+            DELETE FROM route_prototypes
+            """
+        )
+    )
 
     provider_rows = conn.execute(
         text(
@@ -80,21 +88,12 @@ with engine.begin() as conn:
     for category, prompts in PROTOTYPES.items():
 
         provider_id = providers[
-            CATEGORY_PROVIDER[category]
+            CATEGORY_MAPPING[category]["provider"]
         ]
 
         for prompt in prompts:
 
             embedding = get_embedding(prompt)
-
-            vector_string = (
-                "[" +
-                ",".join(
-                    str(x)
-                    for x in embedding
-                ) +
-                "]"
-            )
 
             conn.execute(
                 text(
@@ -117,9 +116,9 @@ with engine.begin() as conn:
                 ),
                 {
                     "category": category,
-                    "prompt": prompt,
-                    "embedding": vector_string,
-                    "provider_id": provider_id
+                    "prompt": build_route_payload(category, prompt),
+                    "embedding": embedding,
+                    "provider_id": provider_id,
                 }
             )
 

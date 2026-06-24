@@ -3,6 +3,38 @@ from sqlalchemy import text
 from database import engine
 
 
+def create_chat(
+    user_id: int,
+    title: str | None = None,
+) -> int:
+
+    with engine.begin() as conn:
+
+        result = conn.execute(
+            text(
+                """
+                INSERT INTO chats
+                (
+                    user_id,
+                    title
+                )
+                VALUES
+                (
+                    :user_id,
+                    :title
+                )
+                RETURNING id
+                """
+            ),
+            {
+                "user_id": user_id,
+                "title": title,
+            },
+        )
+
+        return result.scalar_one()
+
+
 def create_request(
     prompt: str,
     chat_id: int | None = None,

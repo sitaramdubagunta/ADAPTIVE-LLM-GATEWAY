@@ -3,16 +3,53 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import PromptBox from "./PromptBox";
 import { markdownComponents, updateAssistantMessage } from "./chatWindowUtils.jsx";
+import { getChatMessages } from "../api";
 
 const API = "http://localhost:8000";
 
-function ChatWindow() {
+function ChatWindow({ activeChatId, setActiveChatId, refreshChats }) {
   const [messages, setMessages] = useState([]);
   const bottomRef = useRef(null);
+  const lastCreatedChatIdRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    if (activeChatId === null) {
+      setMessages([]);
+    } else {
+      if (lastCreatedChatIdRef.current === activeChatId) {
+        lastCreatedChatIdRef.current = null;
+        return;
+      }
+
+      setMessages([]);
+      getChatMessages(activeChatId)
+        .then((data) => {
+          const mapped = data.map((msg) => {
+            if (msg.role === "assistant" && msg.metadata) {
+              return {
+                ...msg,
+                metadata: {
+                  ...msg.metadata,
+                  latency: msg.metadata.latency_ms,
+                },
+              };
+            }
+            return msg;
+          });
+          setMessages(mapped);
+        })
+        .catch((err) => {
+          console.error("Failed to load chat messages:", err);
+          setMessages([
+            { id: Date.now(), role: "assistant", content: "Failed to load chat history.", metadata: null }
+          ]);
+        });
+    }
+  }, [activeChatId]);
 
   async function sendMessage(prompt) {
     const assistantId = Date.now();
@@ -31,7 +68,7 @@ function ChatWindow() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ message: prompt }),
+        body: JSON.stringify({ message: prompt, chat_id: activeChatId }),
       });
 
       if (!response.ok) throw new Error("Request failed");
@@ -39,6 +76,7 @@ function ChatWindow() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let hasUpdatedChats = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -53,7 +91,12 @@ function ChatWindow() {
           if (!event.startsWith("data:")) continue;
 
           const raw = event.slice(5).trim();
-          if (raw === "[DONE]") return;
+          if (raw === "[DONE]") {
+            if (!activeChatId) {
+              refreshChats();
+            }
+            return;
+          }
 
           let data;
 
@@ -77,6 +120,15 @@ function ChatWindow() {
                 latency: data.latency_ms,
               },
             }));
+
+            if (data.chat_id) {
+              lastCreatedChatIdRef.current = data.chat_id;
+              setActiveChatId(data.chat_id);
+              if (!hasUpdatedChats) {
+                hasUpdatedChats = true;
+                refreshChats();
+              }
+            }
           }
         }
       }
@@ -88,6 +140,7 @@ function ChatWindow() {
       }));
     }
   }
+
 
   return (
     <main className="flex h-screen flex-1 flex-col bg-black">

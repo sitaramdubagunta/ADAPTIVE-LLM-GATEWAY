@@ -121,4 +121,31 @@ export async function uploadAudio(file) {
   return response.json();
 }
 
+/* ---------------------- MULTI-CHAT ---------------------- */
+
+export async function getChats() {
+  const response = await fetch(`${API}/v1/chats`, {
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to load chats.");
+  }
+
+  return response.json();
+}
+
+export async function getChatMessages(chatId) {
+  const response = await fetch(`${API}/v1/chats/${chatId}/messages`, {
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to load chat messages.");
+  }
+
+  return response.json();
+}
+
+
 

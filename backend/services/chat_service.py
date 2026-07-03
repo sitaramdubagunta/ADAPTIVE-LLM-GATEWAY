@@ -7,6 +7,7 @@ from services.persistence_service import (
     create_chat,
     create_request,
     create_response,
+    update_chat_timestamp,
 )
 from services.router import choose_provider
 
@@ -61,14 +62,13 @@ class ChatService:
     async def handle_message(
         self,
         message: str,
+        chat_id: int | None = None,
         stream: bool = False,
         current_user_id: int | None = None,
     ):
-        chat_id = (
-            create_chat(user_id=current_user_id, title=message[:80])
-            if current_user_id is not None
-            else None
-        )
+        if chat_id is None and current_user_id is not None:
+            chat_id = create_chat(user_id=current_user_id, title=message[:80])
+
         request_id = create_request(prompt=message, chat_id=chat_id)
         route_config = choose_provider(message) or {"provider_name": "groq", "model_name": "openai/gpt-oss-20b"}
         provider_name, target_model = route_config["provider_name"], route_config["model_name"]
@@ -90,7 +90,9 @@ class ChatService:
 
                         latency_ms = int((time.perf_counter() - start_time) * 1000)
                         create_response(request_id=request_id, provider_id=PROVIDER_IDS[current_provider_name], content="".join(parts), latency_ms=latency_ms)
-                        yield json.dumps({"type": "meta", "provider": current_provider_name, "model": current_model, "latency_ms": latency_ms})
+                        if chat_id is not None:
+                            update_chat_timestamp(chat_id)
+                        yield json.dumps({"type": "meta", "provider": current_provider_name, "model": current_model, "latency_ms": latency_ms, "chat_id": chat_id})
 
                         return
 
@@ -114,7 +116,9 @@ class ChatService:
                 response = await asyncio.to_thread(provider.generate, message, current_model)
                 latency_ms = int((time.perf_counter() - start_time) * 1000)
                 create_response(request_id=request_id, provider_id=PROVIDER_IDS[current_provider_name], content=response, latency_ms=latency_ms)
-                return {"mode": "response", "provider": current_provider_name, "model": current_model, "latency_ms": latency_ms, "response": response}
+                if chat_id is not None:
+                    update_chat_timestamp(chat_id)
+                return {"mode": "response", "provider": current_provider_name, "model": current_model, "latency_ms": latency_ms, "response": response, "chat_id": chat_id}
 
             except Exception as error:
                 last_error = error

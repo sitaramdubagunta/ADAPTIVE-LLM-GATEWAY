@@ -4,29 +4,27 @@ function PromptBox({ onSend }) {
   const [prompt, setPrompt] = useState("");
 
   function handleSend() {
-    if (!prompt.trim()) return;
+    const value = prompt.trim();
 
-    onSend(prompt);
+    if (!value) return;
+
+    onSend(value);
     setPrompt("");
-  }
-
-  function handleKeyDown(e) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
   }
 
   return (
     <div className="border-t border-zinc-900 bg-black p-6">
-
       <div className="mx-auto flex max-w-4xl items-center rounded-2xl border border-zinc-800 bg-[#0B0B0B] px-4 py-3">
-
         <textarea
           rows={1}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          onKeyDown={handleKeyDown}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
           placeholder="Message LLM Gateway..."
           className="flex-1 resize-none bg-transparent text-white outline-none placeholder:text-zinc-500"
         />
@@ -37,9 +35,7 @@ function PromptBox({ onSend }) {
         >
           ↑
         </button>
-
       </div>
-
     </div>
   );
 }

@@ -19,9 +19,7 @@ GENERAL_QA_CATEGORY = "general_qa"
 
 
 def _load_route_config(category: str) -> dict[str, str] | None:
-
     with engine.connect() as conn:
-
         result = conn.execute(
             text(
                 """
@@ -53,25 +51,22 @@ def _load_route_config(category: str) -> dict[str, str] | None:
     if not provider_name or not model_name:
         return None
 
-    return {
-        "provider_name": provider_name,
-        "model_name": model_name,
-    }
+    return {"provider_name": provider_name, "model_name": model_name}
 
 
-def choose_provider(prompt: str) -> dict[str, str]:
+def _general_route() -> dict[str, str] | None:
+    return _load_route_config(GENERAL_QA_CATEGORY)
 
-    if CODE_GUARD.search(prompt):
-        return _load_route_config("coding") or _load_route_config(GENERAL_QA_CATEGORY)
 
-    if MATH_GUARD.search(prompt):
-        return _load_route_config("math") or _load_route_config(GENERAL_QA_CATEGORY)
+def _resolve_route_config(category: str | None = None, embedding: list[float] | None = None):
+    if category is not None:
+        return _load_route_config(category) or _general_route()
 
-    embedding = get_embedding(prompt)
+    if embedding is None:
+        return _general_route()
 
     with engine.connect() as conn:
-
-        result = conn.execute(
+        row = conn.execute(
             text(
                 """
                 SELECT rp.example_prompt,
@@ -80,36 +75,32 @@ def choose_provider(prompt: str) -> dict[str, str]:
                 FROM route_prototypes rp
                 JOIN providers p
                     ON p.id = rp.provider_id
-                ORDER BY
-                    distance
+                ORDER BY distance
                 LIMIT 1
                 """
             ),
-            {
-                "embedding": embedding,
-            }
-        )
+            {"embedding": embedding},
+        ).fetchone()
 
-        row = result.fetchone()
-
-    if not row:
-        return _load_route_config(GENERAL_QA_CATEGORY)
-
-    if row.distance is None or row.distance > 0.65:
-        return _load_route_config(GENERAL_QA_CATEGORY)
+    if not row or row.distance is None or row.distance > 0.65:
+        return _general_route()
 
     try:
         config = json.loads(row.example_prompt)
     except json.JSONDecodeError:
-        return _load_route_config(GENERAL_QA_CATEGORY)
-
-    provider_name = config.get("provider_name") or row.provider_name
-    model_name = config.get("model_name")
-
-    if not provider_name or not model_name:
-        return _load_route_config(GENERAL_QA_CATEGORY)
+        return _general_route()
 
     return {
-        "provider_name": provider_name,
-        "model_name": model_name,
-    }
+        "provider_name": config.get("provider_name") or row.provider_name,
+        "model_name": config.get("model_name"),
+    } if (config.get("provider_name") or row.provider_name) and config.get("model_name") else _general_route()
+
+
+def choose_provider(prompt: str) -> dict[str, str]:
+    if CODE_GUARD.search(prompt):
+        return _resolve_route_config("coding")
+
+    if MATH_GUARD.search(prompt):
+        return _resolve_route_config("math")
+
+    return _resolve_route_config(embedding=get_embedding(prompt))

@@ -13,59 +13,38 @@ load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 async_client = (
-    AsyncGroq(api_key=os.getenv("GROQ_API_KEY"))
-    if AsyncGroq is not None
-    else None
+    AsyncGroq(api_key=os.getenv("GROQ_API_KEY")) if AsyncGroq is not None else None
 )
+
+
+def _messages(message: str):
+    return [{"role": "user", "content": message}]
+
+
+def _token_from_chunk(chunk):
+    return getattr(getattr(chunk.choices[0], "delta", None), "content", None)
 
 
 class GroqProvider:
     def generate(self, message: str, model: str = None):
         response = client.chat.completions.create(
-            model=model or "openai/gpt-oss-20b",
-            messages=[
-                {
-                    "role": "user",
-                    "content": message,
-                }
-            ],
+            model=model or "openai/gpt-oss-20b", messages=_messages(message)
         )
 
         return response.choices[0].message.content
 
     async def generate_stream(self, message: str, model: str = None):
         if async_client is None:
-            response = await asyncio.to_thread(
-                self.generate,
-                message,
-                model,
-            )
+            response = await asyncio.to_thread(self.generate, message, model)
 
             if response:
                 yield response
             return
 
         stream = await async_client.chat.completions.create(
-            model=model or "openai/gpt-oss-20b",
-            messages=[
-                {
-                    "role": "user",
-                    "content": message,
-                }
-            ],
-            stream=True,
+            model=model or "openai/gpt-oss-20b", messages=_messages(message), stream=True
         )
 
         async for chunk in stream:
-            token = getattr(
-                getattr(
-                    chunk.choices[0],
-                    "delta",
-                    None,
-                ),
-                "content",
-                None,
-            )
-
-            if token:
+            if token := _token_from_chunk(chunk):
                 yield token

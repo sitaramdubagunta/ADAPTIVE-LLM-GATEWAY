@@ -31,6 +31,12 @@ export const markdownComponents = {
   ol: ({ children }) => <ol className="mb-4 list-decimal space-y-1 pl-5 text-zinc-300">{children}</ol>,
 };
 
-export function updateAssistantMessage(setMessages, assistantId, updater) {
-  setMessages((prev) => prev.map((msg) => (msg.id === assistantId ? updater(msg) : msg)));
+export function updateAssistantMessage(setMessages, assistantId, updater, activeChatId, messageCache) {
+  setMessages((prev) => {
+    const next = prev.map((msg) => (msg.id === assistantId ? updater(msg) : msg));
+    if (activeChatId && messageCache) {
+      messageCache[activeChatId] = next;
+    }
+    return next;
+  });
 }

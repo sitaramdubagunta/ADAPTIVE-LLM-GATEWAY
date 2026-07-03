@@ -66,12 +66,21 @@ class ChatService:
         stream: bool = False,
         current_user_id: int | None = None,
     ):
-        if chat_id is None and current_user_id is not None:
-            chat_id = create_chat(user_id=current_user_id, title=message[:80])
+        async def get_db_ids():
+            nonlocal chat_id
+            if chat_id is None and current_user_id is not None:
+                chat_id = await asyncio.to_thread(create_chat, user_id=current_user_id, title=message[:80])
+            req_id = await asyncio.to_thread(create_request, prompt=message, chat_id=chat_id)
+            return req_id
 
-        request_id = create_request(prompt=message, chat_id=chat_id)
-        route_config = choose_provider(message) or {"provider_name": "groq", "model_name": "openai/gpt-oss-20b"}
+        route_config, request_id = await asyncio.gather(
+            asyncio.to_thread(choose_provider, message),
+            get_db_ids()
+        )
+        if not route_config:
+            route_config = {"provider_name": "groq", "model_name": "openai/gpt-oss-20b"}
         provider_name, target_model = route_config["provider_name"], route_config["model_name"]
+
 
         if stream:
             async def token_stream():

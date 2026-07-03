@@ -7,6 +7,9 @@ import { getChatMessages } from "../api";
 
 const API = "http://localhost:8000";
 
+// In-memory frontend cache for chat messages
+const messageCache = {};
+
 function ChatWindow({ activeChatId, setActiveChatId, refreshChats }) {
   const [messages, setMessages] = useState([]);
   const bottomRef = useRef(null);
@@ -20,6 +23,11 @@ function ChatWindow({ activeChatId, setActiveChatId, refreshChats }) {
     if (activeChatId === null) {
       setMessages([]);
     } else {
+      if (messageCache[activeChatId]) {
+        setMessages(messageCache[activeChatId]);
+        return;
+      }
+
       if (lastCreatedChatIdRef.current === activeChatId) {
         lastCreatedChatIdRef.current = null;
         return;
@@ -40,6 +48,7 @@ function ChatWindow({ activeChatId, setActiveChatId, refreshChats }) {
             }
             return msg;
           });
+          messageCache[activeChatId] = mapped;
           setMessages(mapped);
         })
         .catch((err) => {
@@ -54,11 +63,17 @@ function ChatWindow({ activeChatId, setActiveChatId, refreshChats }) {
   async function sendMessage(prompt) {
     const assistantId = Date.now();
 
-    setMessages((prev) => [
-      ...prev,
-      { id: assistantId - 1, role: "user", content: prompt },
-      { id: assistantId, role: "assistant", content: "", metadata: null },
-    ]);
+    setMessages((prev) => {
+      const next = [
+        ...prev,
+        { id: assistantId - 1, role: "user", content: prompt },
+        { id: assistantId, role: "assistant", content: "", metadata: null },
+      ];
+      if (activeChatId) {
+        messageCache[activeChatId] = next;
+      }
+      return next;
+    });
 
     try {
       const token = localStorage.getItem("token");
@@ -110,8 +125,9 @@ function ChatWindow({ activeChatId, setActiveChatId, refreshChats }) {
             updateAssistantMessage(setMessages, assistantId, (msg) => ({
               ...msg,
               content: msg.content + data.content,
-            }));
+            }), activeChatId, messageCache);
           } else if (data.type === "meta") {
+            const currentChatId = activeChatId || data.chat_id;
             updateAssistantMessage(setMessages, assistantId, (msg) => ({
               ...msg,
               metadata: {
@@ -119,11 +135,17 @@ function ChatWindow({ activeChatId, setActiveChatId, refreshChats }) {
                 model: data.model,
                 latency: data.latency_ms,
               },
-            }));
+            }), currentChatId, messageCache);
 
             if (data.chat_id) {
               lastCreatedChatIdRef.current = data.chat_id;
               setActiveChatId(data.chat_id);
+              
+              setMessages((prev) => {
+                messageCache[data.chat_id] = prev;
+                return prev;
+              });
+
               if (!hasUpdatedChats) {
                 hasUpdatedChats = true;
                 refreshChats();
@@ -137,9 +159,10 @@ function ChatWindow({ activeChatId, setActiveChatId, refreshChats }) {
       updateAssistantMessage(setMessages, assistantId, (msg) => ({
         ...msg,
         content: "Something went wrong.",
-      }));
+      }), activeChatId, messageCache);
     }
   }
+
 
 
   return (

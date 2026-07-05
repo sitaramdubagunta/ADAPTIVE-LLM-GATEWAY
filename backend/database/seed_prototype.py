@@ -8,7 +8,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from database import engine
 from services.embedding_service import get_embedding
-
+print(engine.url.render_as_string(hide_password=False))
 
 CATEGORY_MAPPING = {
     "general_qa": {"provider": "groq", "model": "openai/gpt-oss-20b"},

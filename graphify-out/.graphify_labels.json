@@ -1,0 +1,14 @@
+{
+  "0": "auth.py",
+  "1": "api.js",
+  "2": "package.json",
+  "3": "Adaptive LLM Gateway",
+  "4": "router.py",
+  "5": "main.py",
+  "6": "chat_service.py",
+  "7": "groq_provider.py",
+  "8": "ChatWindow.jsx",
+  "9": "dependencies",
+  "10": "React + Vite",
+  "11": "screenshots/README.md"
+}

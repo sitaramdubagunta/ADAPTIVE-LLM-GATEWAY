@@ -29,6 +29,9 @@ class ChatService:
             or "too many requests" in error_text
             or "429" in error_text
             or "503" in error_text
+            or "model_not_found" in error_text
+            or "does not exist" in error_text
+            or "404" in error_text
         )
 
     def _route_candidates(self, provider_name: str, target_model: str):

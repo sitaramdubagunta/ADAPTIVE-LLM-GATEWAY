@@ -5,7 +5,7 @@ import PromptBox from "./PromptBox";
 import { markdownComponents, updateAssistantMessage } from "./chatWindowUtils.jsx";
 import { getChatMessages } from "../api";
 
-const API = "http://localhost:8000";
+const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 // In-memory frontend cache for chat messages
 const messageCache = {};

@@ -8,15 +8,14 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from database import engine
 from services.embedding_service import get_embedding
-print(engine.url.render_as_string(hide_password=False))
 
 CATEGORY_MAPPING = {
     "general_qa": {"provider": "groq", "model": "openai/gpt-oss-20b"},
     "coding": {"provider": "groq", "model": "openai/gpt-oss-120b"},
     "math": {"provider": "groq", "model": "openai/gpt-oss-120b"},
-    "reasoning_tasks": {"provider": "groq", "model": "qwen/qwen3.6-27b"},
-    "multilingual": {"provider": "groq", "model": "qwen/qwen3-32b"},
-    "system_design": {"provider": "gemini", "model": "gemini-2.5-pro"},
+    "reasoning_tasks": {"provider": "groq", "model": "qwen/qwen3.8-27b"},
+    "multilingual": {"provider": "groq", "model": "qwen/qwen3.8-27b"},
+    "system_design": {"provider": "gemini", "model": "gemini-3.1-pro-preview"},
     "creative": {"provider": "gemini", "model": "gemini-2.5-flash"},
     "agent_search": {"provider": "groq", "model": "groq/compound"},
     "agent_mini": {"provider": "groq", "model": "groq/compound-mini"},
